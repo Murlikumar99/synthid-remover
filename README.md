@@ -1,226 +1,206 @@
 # SynthID Remover — Lossless AI Image Watermark & C2PA Metadata Stripper
 
-> **Neutralize invisible high-frequency AI watermarks (SynthID) and strip C2PA Content Credentials provenance manifests from PNG, JPEG, and WebP images. Lossless algorithm (PSNR > 52 dB), zero cloud dependencies, works 100% offline.**
-
----
-
 <div align="center">
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-22.x-green?logo=node.js)](https://nodejs.org/)
-[![Python](https://img.shields.io/badge/Python-3.10+-yellow?logo=python)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-MIT-purple)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/Murlikumar99/synthid-remover?style=for-the-badge&color=blue)](https://github.com/Murlikumar99/synthid-remover/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/Murlikumar99/synthid-remover?style=for-the-badge&color=indigo)](https://github.com/Murlikumar99/synthid-remover/network)
+[![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg?style=for-the-badge)](LICENSE)
+[![Quality: Lossless](https://img.shields.io/badge/PSNR-%3E%2052.0%20dB-emerald.svg?style=for-the-badge)](#-algorithm--technical-specifications)
+[![Privacy: 100% Offline](https://img.shields.io/badge/Privacy-100%25%20Offline-green.svg?style=for-the-badge)](#-privacy--security-guarantee)
+
+<br/>
+
+**A fast, zero-dependency, dual-layer neutralizer that suppresses invisible SynthID frequency-domain watermarks and strips C2PA Content Credentials provenance metadata from PNG, JPEG, and WebP images at full native resolution.**
+
+[Quick Start](#-quick-start) • [How It Works](#-how-it-works) • [CLI Usage](#-cli-usage) • [Web Workspace](#-local-web-server--ui) • [SEO & Keywords](#-search-keywords--supported-tags) • [FAQ](#-frequently-asked-questions)
 
 </div>
 
 ---
 
-## 📖 What is SynthID?
+## 🎯 Key Highlights
 
-**SynthID** is an invisible watermark embedded by AI models into the pixel values of generated images. In parallel, **C2PA** (Coalition for Content Provenance and Authenticity) embeds cryptographic provenance manifests into the binary file headers — including generator tags, timestamps, and signing certificates.
-
-**SynthID Remover** neutralizes both layers completely:
-
-| Layer | What Gets Removed | Technique |
-|:---|:---|:---|
-| **SynthID Pixel Carrier** | Invisible LSB frequency watermark in pixel values | Anti-phase spatial carrier cancellation |
-| **C2PA Manifest (PNG)** | `caBX`, `c2pa`, `eXIf`, `iTXt`, `tEXt` chunks | Binary chunk stripping + CRC-32 rebuild |
-| **C2PA Manifest (JPEG)** | `APP11` (JUMBF), `APP1` (EXIF/XMP) markers | Marker segment extraction |
-| **C2PA Manifest (WebP)** | RIFF EXIF metadata chunks | RIFF chunk stripping |
+- **Dual-Layer Neutralization**: Concurrently neutralizes high-frequency pixel carrier watermarks (**SynthID**) and strips binary file headers (**C2PA Content Credentials**).
+- **Visually Lossless Quality**: Preserves native image resolution up to 4K+ at **PSNR > 52.0 dB** (Peak Signal-to-Noise Ratio).
+- **Zero Cloud Uploads (100% Offline)**: All processing runs locally inside your terminal or browser memory — no data is sent to external servers.
+- **Cross-Platform Support**: Works on Linux, Windows, macOS, Android (via Termux/native terminal), and in modern web browsers.
+- **Multiple Interfaces**: Command line (Python 3, Node.js), standalone single-file HTML app, or full-featured local React web application.
 
 ---
 
-## 🚀 Quick Start — Get Running in 60 Seconds
+## 🔍 How It Works
 
-### Clone the repository
+AI image generators embed identifying signatures in two distinct layers:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                             ORIGINAL AI IMAGE                               │
+├──────────────────────────────────────┬──────────────────────────────────────┤
+│       LAYER 1: BINARY METADATA       │       LAYER 2: PIXEL DATA (RGB)      │
+│  • C2PA Manifests (JUMBF APP11)      │  • SynthID High-Frequency Carrier    │
+│  • EXIF / XMP Generator Tags         │  • LSB Spatial Phase Alignment       │
+│  • Signing Certificates & Hashes     │  • 8x8 Convolution Patch Signatures  │
+└──────────────────┬───────────────────┴──────────────────┬───────────────────┘
+                   │                                      │
+                   ▼                                      ▼
+       [ Physical Chunk Stripper ]            [ Anti-Phase Neutralizer ]
+                   │                                      │
+                   ▼                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           100% CLEAN IMAGE OUTPUT                           │
+│     ✓ Clean File Headers (No C2PA)   │    ✓ Neutralized Pixels (PSNR > 52dB)│
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+1. **Binary Container Stripping**:
+   - **PNG**: Physically walks the chunk tree, removes `caBX`, `c2pa`, `eXIf`, `iTXt`, `tEXt`, and `zTXt` chunks, and recalculates IEEE 802.3 CRC-32 checksums.
+   - **JPEG**: Strips `APP11` (C2PA JUMBF marker `0xFFEB`) and `APP1` (EXIF/XMP marker `0xFFE1`) marker segments.
+   - **WebP**: Strips `RIFF` EXIF and C2PA metadata chunks.
+2. **Frequency Carrier Neutralization**:
+   - Applies an anti-phase spatial harmonic carrier shift: `phase = ((7x + 13y) mod 3) - 1`
+   - Adjusts Least Significant Bits (LSB) to disrupt phase coherence without perceptible luminance or chrominance shifts.
+   - Introduces CNN block boundary jitter on 8×8 edges to desynchronize patch-based statistical detectors.
+
+---
+
+## 🚀 Quick Start
+
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/Murlikumar99/synthid-remover.git
 cd synthid-remover
 ```
 
-### Install dependencies
+### 2. Choose your preferred way to run
 
-```bash
-npm install --legacy-peer-deps
-```
-
-### Start the web app
-
-```bash
-npm run dev
-```
-
-Then open **[http://localhost:3000](http://localhost:3000)** in your browser.
+| Method | Best For | Prerequisites | Command |
+| :--- | :--- | :--- | :--- |
+| **Python CLI** | Fast batch terminal scripts | Python 3.10+ (standard library only) | `python scripts/remove_synthid.py input.png output.png` |
+| **Node.js CLI** | Node pipelines & server tasks | Node.js 18+ (native modules only) | `node scripts/remove_synthid.mjs input.png output.png` |
+| **Standalone HTML** | Double-click in-browser use | Modern Web Browser | Double-click `synthid_remover_standalone.html` |
+| **Full Web App** | Visual UI with real-time scanner | Node.js 18+ | `npm install && npm run dev` |
 
 ---
 
-## 🛠️ All Ways to Run
+## 💻 CLI Usage
 
-### Method 1: Python 3 CLI — Zero Setup, No pip Required
+### Python 3 CLI (Zero External Dependencies)
 
-Uses only Python standard library (`zlib`, `struct`, `math`):
+Uses only Python's standard library (`zlib`, `struct`, `math`):
 
 ```bash
-# Syntax:
-python scripts/remove_synthid.py <input_image> <output_image>
-
-# Examples:
+# Basic file processing:
 python scripts/remove_synthid.py "input_image.png" "clean_image.png"
 python scripts/remove_synthid.py "photo.jpg" "photo_clean.jpg"
 python scripts/remove_synthid.py "artwork.webp" "artwork_clean.webp"
-```
 
-**JSON stdio mode (for automation/scripts):**
-```bash
+# JSON stdio mode for automated scripting and backend microservices:
 python scripts/remove_synthid.py --stdin-json <<EOF
-{"base64Data": "...base64 encoded image bytes..."}
+{"base64Data": "...base64_encoded_image_bytes..."}
 EOF
 ```
 
----
-
-### Method 2: Node.js CLI
-
-Uses only Node.js built-ins (`node:fs`, `node:zlib`, `node:crypto`):
+### Node.js CLI (Pure Standard Library)
 
 ```bash
-# Syntax:
-node scripts/remove_synthid.mjs <input_image> <output_image>
-
-# Examples:
-node scripts/remove_synthid.mjs "artwork.png" "artwork_clean.png"
-node scripts/remove_synthid.mjs "photo.jpg" "photo_clean.jpg"
+node scripts/remove_synthid.mjs "input.png" "output_clean.png"
+node scripts/remove_synthid.mjs "sample.jpg" "sample_clean.jpg"
 ```
 
 ---
 
-### Method 3: Local Web Server (Full Interactive UI)
+## 🌐 Local Web Server & UI
+
+To launch the full interactive web application with real-time visual scanning telemetry:
 
 ```bash
-# After cloning and installing:
+# 1. Install dependencies:
+npm install --legacy-peer-deps
+
+# 2. Run the dev server:
 npm run dev
-
-# Or run the backend server directly with TypeScript support:
-node node_modules/tsx/dist/cli.mjs server.ts
 ```
 
-**Server starts at:** `http://localhost:3000`
+Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
-Features of the web UI:
-- 🖱️ Drag-and-drop file upload (PNG, JPEG, WebP)
-- 🔍 Real-time laser pixel scan visualization
-- 📊 Telemetry: format, bytes removed, PSNR, modified pixel count
-- 🔐 HMAC-SHA256 cryptographic verification receipt
-- 💾 One-click clean image download
-- 🧪 Load sample AI image for testing
-
----
-
-### Method 4: Standalone HTML Tool (No Server or Install Required)
-
-A completely self-contained, single-file tool that runs in any browser — no server, no install, no network:
-
-```bash
-# After cloning, just open this file in any browser:
-open synthid_remover_standalone.html
-
-# Or on Android:
-# Navigate to the file and tap to open in Chrome/Firefox
-```
-
-All processing runs client-side via HTML5 Canvas API and `Uint8Array` binary parsing.
+**Web App Features:**
+- 🖱️ Interactive drag-and-drop dropzone supporting PNG, JPEG, and WebP up to 50 MB
+- ⚡ Real-time pixel carrier laser scan visualization
+- 📊 Instant telemetry: format, bytes stripped, PSNR, and modified pixel count
+- 🔒 Cryptographic HMAC-SHA256 receipt generation
+- 💾 One-click clean download (supports original native resolution up to 4K+)
 
 ---
 
-## 📸 Supported Formats
+## 🧪 Testing & Validation
 
-| Format | C2PA Binary Strip | SynthID Pixel Neutralization | Full Resolution |
-|:---:|:---:|:---:|:---:|
-| **PNG** | ✅ | ✅ | ✅ Up to 4K+ |
-| **JPEG / JPG** | ✅ | ✅ | ✅ Up to 4K+ |
-| **WebP** | ✅ | ✅ | ✅ Up to 4K+ |
-
----
-
-## 🧪 Run Tests
+Run the automated test suite to verify pixel neutralization, CRC-32 integrity, and binary chunk stripping across all formats:
 
 ```bash
 npm test
 ```
 
 Expected output:
-```
-✔ neutralizeSynthIdPixelBuffer — PSNR 52.9 dB (visually lossless)
-✔ analyzePixelCarrierSignature — carrier suppression verified
-✔ inspectAndStripBinaryMedia — PNG caBX, eXIf chunk stripping
-✔ inspectAndStripBinaryMedia — JPEG APP11 C2PA stripping
-✔ nodePngSynthIdEngine — lossless IDAT scanline reconstruction
-✔ ... (12/12 tests passing)
-```
-
----
-
-## 📁 Project Structure
-
-```
-synthid-remover/
-├── README.md                          # This file
-├── package.json                       # Node.js dependencies
-├── server.ts                          # Express + Vite dev server
-├── vite.config.ts                     # Vite bundler config
-├── tsconfig.json                      # TypeScript config
-├── scripts/
-│   ├── remove_synthid.py              # Python 3 standalone CLI
-│   └── remove_synthid.mjs             # Node.js standalone CLI
-└── src/
-    ├── main.tsx                       # React app entry
-    ├── App.tsx                        # Root component
-    ├── components/
-    │   └── SynthIdToolWorkspace.tsx   # Main UI workspace
-    └── utils/
-        ├── synthIdEngine.ts           # Pixel carrier neutralizer + PSNR
-        ├── binaryMediaEngine.ts       # PNG/JPEG/WebP binary parser
-        ├── nodePngSynthIdEngine.ts    # Node.js IDAT deflate re-encoder
-        └── synthIdEngine.test.ts      # Test suite
+```text
+✔ validateMediaFile accepts valid images and rejects invalid formats
+✔ parseAndStripPngBuffer strips caBX, eXIf, and iTXt metadata chunks
+✔ rewritePngSynthIdNode decompresses IDAT scanlines and neutralizes SynthID
+✔ inspectAndStripBinaryMedia accurately removes JPEG APP11 C2PA markers
+✔ neutralizeSynthIdPixelBuffer achieves visually lossless PSNR (> 50 dB)
+ℹ pass 12
+ℹ fail 0
 ```
 
 ---
 
-## ⚙️ Algorithm Details
+## 📊 Format Compatibility Matrix
 
-### Stage 1: Binary Container Stripping
-Physically parses the raw image bitstream — no re-encoding, no quality loss:
-- **PNG**: Reads each chunk header, strips provenance chunks by type code, recalculates IEEE 802.3 CRC-32 for the remaining chunks
-- **JPEG**: Walks marker segments, removes `APP11` (JUMBF C2PA) and `APP1` (EXIF/XMP) markers
-- **WebP**: Strips RIFF `EXIF` and C2PA metadata chunks
-
-### Stage 2: Pixel Carrier Neutralization
-Targets the invisible LSB frequency watermark embedded in pixel RGB values:
-```
-Phase shift = ((7x + 13y) mod 3) − 1   →  {-1, 0, +1}
-Target LSB  = phase > 0 ? 1 : 0
-New pixel   = (original & 0xFE) | target_LSB
-```
-Result: **PSNR > 52.0 dB** — imperceptible difference from the original.
-
-### Stage 3: CNN Block Boundary Desynchronization
-Applies boundary jitter on 8×8 convolution block edges to prevent patch-based watermark correlation:
-```
-Boundary jitter = ((11x + 17y) mod 3) − 1   →  {-1, 0, +1}
-```
+| Feature | PNG | JPEG / JPG | WebP |
+| :--- | :---: | :---: | :---: |
+| **C2PA Metadata Stripping** | ✅ `caBX`, `c2pa` | ✅ `APP11 (JUMBF)` | ✅ `RIFF chunks` |
+| **EXIF / XMP Removal** | ✅ `eXIf`, `iTXt` | ✅ `APP1` | ✅ `EXIF` |
+| **Pixel Carrier Neutralization** | ✅ Spatial Anti-Phase | ✅ Scanline Filter | ✅ Lossless Re-quantize |
+| **Max Resolution Supported** | Full Native (4K+) | Full Native (4K+) | Full Native (4K+) |
+| **Visual Losslessness** | PSNR > 52 dB | PSNR > 52 dB | PSNR > 52 dB |
 
 ---
 
-## 🔒 Privacy & Security
+## 🔒 Privacy & Security Guarantee
 
-- ✅ **100% offline** — no image bytes ever leave your device
-- ✅ **No external API calls** for core processing
-- ✅ Local server uses per-session rate limiting and strict CORS validation
-- ✅ All file processing is in-memory — no temporary files written to disk
+1. **No External Telemetry**: The application makes zero outbound requests during image processing.
+2. **In-Memory Operations**: Image bytes are processed in memory and never persisted to external disks or third-party servers.
+3. **No Account Required**: The core tools (CLI, Standalone HTML) require no login, API keys, or registration.
+
+---
+
+## 🏷️ Search Keywords & Supported Tags
+
+To help developers and creators discover this tool on search engines and GitHub, this project covers:
+
+| Category | High-Traffic Search Keywords |
+| :--- | :--- |
+| **Primary Queries** | `synthid remover`, `remove synthid`, `synthid bypass`, `how to remove synthid watermark`, `synthid watermark removal` |
+| **C2PA & Provenance** | `c2pa remover`, `strip c2pa`, `c2pa metadata stripper`, `content credentials remover`, `remove jumbf app11` |
+| **AI Watermark Removal** | `ai watermark remover`, `remove ai watermark from image`, `ai image metadata remover`, `imagen watermark remover` |
+| **Technical Keywords** | `steganography neutralizer`, `frequency domain carrier cancellation`, `lossless watermark removal`, `lsb carrier shift` |
+| **Supported Filetypes** | `png watermark remover`, `jpeg c2pa stripper`, `webp ai metadata cleaner`, `lossless image cleaning` |
+
+---
+
+## ❓ Frequently Asked Questions
+
+### Does removing SynthID change image quality?
+No. The anti-phase harmonic neutralization algorithm operates with an average Peak Signal-to-Noise Ratio (PSNR) greater than **52.0 dB**, which is well above the standard threshold for human visual losslessness (typically 40 dB).
+
+### Can this run in offline environments or air-gapped systems?
+Yes. Both the Python CLI (`scripts/remove_synthid.py`) and standalone HTML tool (`synthid_remover_standalone.html`) use standard libraries only and require zero network access.
+
+### Is C2PA metadata completely removed?
+Yes. Container chunks such as `caBX`, `c2pa`, `APP11 (JUMBF)`, and associated EXIF provenance records are physically stripped from the byte stream, rather than simply masked.
 
 ---
 
 ## 📄 License
 
-MIT License — free to use, modify, and distribute.
+Distributed under the **MIT License**. Free for personal, commercial, and research use. See `LICENSE` for details.
