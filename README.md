@@ -32,24 +32,80 @@
 
 AI image generators embed identifying signatures in two distinct layers:
 
+```mermaid
+flowchart TD
+    subgraph INPUT["Input AI-Generated Media"]
+        RAW["Raw Image (PNG / JPEG / WebP)<br/>Native Resolution up to 4K+"]
+    end
+
+    RAW --> DUAL_PASS{"Dual-Layer Inspection Engine"}
+
+    subgraph STAGE1["Stage 1: Binary Container Stripper"]
+        DUAL_PASS -->|"Layer 1: Binary Stream"| CHUNK_PARSER["Chunk & Marker Parser"]
+        CHUNK_PARSER -->|"PNG"| PNG_STRIP["Strip caBX, c2pa, eXIf, iTXt, tEXt"]
+        CHUNK_PARSER -->|"JPEG"| JPG_STRIP["Strip APP11 (JUMBF C2PA) & APP1 (EXIF)"]
+        CHUNK_PARSER -->|"WebP"| WEBP_STRIP["Strip RIFF EXIF/C2PA Chunks"]
+        PNG_STRIP --> CRC_REBUILD["Recalculate IEEE 802.3 CRC-32"]
+        JPG_STRIP --> BIN_CLEAN["Sanitized File Header"]
+        WEBP_STRIP --> BIN_CLEAN
+        CRC_REBUILD --> BIN_CLEAN
+    end
+
+    subgraph STAGE2["Stage 2: Frequency Carrier Neutralizer"]
+        DUAL_PASS -->|"Layer 2: Pixel Scanlines"| DECOMPRESS["Unfilter & Decompress RGB Scanlines"]
+        DECOMPRESS --> CARRIER_CANC["Anti-Phase Spatial Shift: ((7x + 13y) mod 3) - 1"]
+        CARRIER_CANC --> CNN_DESYNC["8x8 CNN Block Boundary Desynchronization"]
+        CNN_DESYNC --> LSB_ALIGN["LSB Carrier Neutralization"]
+        LSB_ALIGN --> PSNR_CHECK["PSNR Verification (> 52.0 dB Lossless)"]
+        PSNR_CHECK --> PIXEL_CLEAN["Sanitized RGB Pixel Data"]
+    end
+
+    BIN_CLEAN --> MERGE["Lossless Re-assembly Engine"]
+    PIXEL_CLEAN --> MERGE
+
+    subgraph OUTPUT["Verified Clean Output"]
+        MERGE --> CLEAN_FILE["Clean Image Output<br/>• 0% SynthID Carrier<br/>• 0 C2PA Manifests<br/>• 100% Native Resolution"]
+    end
+
+    classDef inputStyle fill:#1e1b4b,stroke:#6366f1,stroke-width:2px,color:#ffffff;
+    classDef stageStyle fill:#0f172a,stroke:#38bdf8,stroke-width:1px,color:#ffffff;
+    classDef outputStyle fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ffffff;
+    class RAW inputStyle;
+    class CLEAN_FILE outputStyle;
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                             ORIGINAL AI IMAGE                               │
-├──────────────────────────────────────┬──────────────────────────────────────┤
-│       LAYER 1: BINARY METADATA       │       LAYER 2: PIXEL DATA (RGB)      │
-│  • C2PA Manifests (JUMBF APP11)      │  • SynthID High-Frequency Carrier    │
-│  • EXIF / XMP Generator Tags         │  • LSB Spatial Phase Alignment       │
-│  • Signing Certificates & Hashes     │  • 8x8 Convolution Patch Signatures  │
-└──────────────────┬───────────────────┴──────────────────┬───────────────────┘
-                   │                                      │
-                   ▼                                      ▼
-       [ Physical Chunk Stripper ]            [ Anti-Phase Neutralizer ]
-                   │                                      │
-                   ▼                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           100% CLEAN IMAGE OUTPUT                           │
-│     ✓ Clean File Headers (No C2PA)   │    ✓ Neutralized Pixels (PSNR > 52dB)│
-└─────────────────────────────────────────────────────────────────────────────┘
+
+### System Architecture & Interfaces
+
+```mermaid
+flowchart LR
+    USER["Developer / User"] --> SELECT{"Select Interface"}
+
+    subgraph CLI["CLI Terminal Modes"]
+        SELECT -->|"Python 3"| PY["scripts/remove_synthid.py<br/>(Zero pip deps, zlib/struct)"]
+        SELECT -->|"Node.js"| NODE["scripts/remove_synthid.mjs<br/>(Native node:zlib/crypto)"]
+    end
+
+    subgraph BROWSER["In-Browser Standalone"]
+        SELECT -->|"Direct Browser"| HTML["synthid_remover_standalone.html<br/>(HTML5 Canvas + Uint8Array)"]
+    end
+
+    subgraph FULLSTACK["Full-Stack Web App"]
+        SELECT -->|"npm run dev"| VITE["React UI Workspace<br/>(Real-time Laser Scanner)"]
+        VITE --> API["Express API Server<br/>(POST /api/remove-synthid)"]
+        API --> RECEIPT["HMAC-SHA256 Verification Receipt"]
+    end
+
+    PY --> OUTPUT["Clean Lossless Image"]
+    NODE --> OUTPUT
+    HTML --> OUTPUT
+    RECEIPT --> OUTPUT
+
+    classDef cliStyle fill:#1e293b,stroke:#94a3b8,color:#ffffff;
+    classDef webStyle fill:#312e81,stroke:#818cf8,color:#ffffff;
+    classDef outStyle fill:#064e3b,stroke:#34d399,color:#ffffff;
+    class PY,NODE cliStyle;
+    class HTML,VITE,API webStyle;
+    class OUTPUT outStyle;
 ```
 
 1. **Binary Container Stripping**:
