@@ -54,11 +54,6 @@ const PIXEL_SCAN_STEPS = [
   'Verifying 0% SynthID signal with backend cryptographic engine...',
 ];
 
-const CARRIER_CELL_INDICES = new Set([
-  2, 5, 9, 14, 17, 21, 25, 28, 31, 34, 38, 41, 45, 49, 52, 56, 59, 63, 66, 70, 74, 77, 81, 85, 89,
-  93,
-]);
-
 function uint8ToBase64(bytes: Uint8Array | Uint8ClampedArray): string {
   let binary = '';
   const len = bytes.byteLength;
@@ -125,7 +120,6 @@ export function SynthIdToolWorkspace({
   const [workflowPhase, setWorkflowPhase] = useState<WorkflowPhase>('c2pa_removed');
   const [scanStepIndex, setScanStepIndex] = useState(0);
   const [scanProgressPct, setScanProgressPct] = useState(0);
-  const [showPixelMap, setShowPixelMap] = useState(true);
   const [isExpandedScanner, setIsExpandedScanner] = useState(false);
   const [selectedEngine, setSelectedEngine] = useState<'nodejs' | 'python3'>('nodejs');
   const [showCodePanel, setShowCodePanel] = useState(false);
@@ -487,7 +481,6 @@ export function SynthIdToolWorkspace({
       setWorkflowPhase('c2pa_removed');
       setScanProgressPct(0);
       setScanStepIndex(0);
-      setShowPixelMap(true);
 
       const c2paStripped = await Promise.all(
         initialReports.map(async (rep) => {
@@ -531,7 +524,6 @@ export function SynthIdToolWorkspace({
     if (reports.length === 0 || workflowPhase === 'pixel_scanning') return;
 
     setWorkflowPhase('pixel_scanning');
-    setShowPixelMap(true);
     setScanStepIndex(0);
     setScanProgressPct(15);
 
@@ -868,233 +860,89 @@ export function SynthIdToolWorkspace({
               </div>
             )}
 
-            {/* FULL-IMAGE PIXEL SCANNING VIEWPORT */}
-            <div className="relative rounded-[22px] overflow-hidden border border-[#ececef] bg-zinc-950 mb-5 shadow-[0_12px_32px_-12px_rgba(13,13,13,0.22)]">
-              <div className="relative w-full overflow-hidden flex items-center justify-center bg-zinc-950">
-                {/* Full Image rendered edge-to-edge without cropping */}
+            {/* CLEAN IMAGE PREVIEW VIEWPORT */}
+            <div className="relative rounded-[20px] overflow-hidden border border-zinc-200 bg-zinc-900 mb-4 shadow-sm group">
+              <div className="relative w-full overflow-hidden flex items-center justify-center bg-zinc-950 min-h-[220px]">
+                {/* Full Image rendered edge-to-edge without obstruction */}
                 <img
                   src={activeReport.cleanedUrl || activeReport.previewUrl || sampleImageUrl}
                   alt={activeReport.fileName}
                   referrerPolicy="no-referrer"
                   className={`w-full h-auto block object-contain transition-all duration-300 ${
-                    isExpandedScanner ? 'max-h-[540px]' : 'max-h-[360px]'
-                  } ${showPixelMap || isScanning ? 'contrast-110 saturate-125' : ''}`}
+                    isExpandedScanner ? 'max-h-[580px]' : 'max-h-[380px]'
+                  }`}
                 />
 
-                {/* 1. Full-Image Fine Pixel Matrix Grid Overlay (100% width & height) */}
-                {(showPixelMap || isScanning) && (
-                  <div
-                    aria-hidden="true"
-                    className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${
-                      isClean
-                        ? 'pixel-matrix-clean-overlay opacity-75'
-                        : isScanning
-                        ? 'pixel-matrix-overlay opacity-95'
-                        : 'pixel-matrix-danger-overlay opacity-85'
-                    }`}
-                  />
-                )}
-
-                {/* 2. Full-Image Vertical Laser Curtain Sweeping Top-to-Bottom (0% -> 100% of full image) */}
-                {(showPixelMap || isScanning) && (
-                  <div
-                    aria-hidden="true"
-                    className="animate-pixel-scan-beam absolute inset-0 pointer-events-none"
-                  >
-                    <div
-                      className={`w-full h-[2.5px] ${
-                        isClean
-                          ? 'bg-emerald-400 shadow-[0_0_20px_4px_rgba(16,185,129,0.85)]'
-                          : isScanning
-                          ? 'bg-[#6336ff] shadow-[0_0_24px_6px_rgba(99,54,255,0.95)]'
-                          : 'bg-red-500 shadow-[0_0_20px_4px_rgba(239,68,68,0.85)]'
-                      }`}
-                    />
-                    <div
-                      className={`w-full h-24 ${
-                        isClean
-                          ? 'bg-linear-to-b from-emerald-500/25 via-emerald-500/5 to-transparent'
-                          : isScanning
-                          ? 'bg-linear-to-b from-[#6336ff]/35 via-[#6336ff]/10 to-transparent'
-                          : 'bg-linear-to-b from-red-500/25 via-red-500/5 to-transparent'
-                      }`}
-                    />
-                  </div>
-                )}
-
-                {/* 3. Full-Image Horizontal Frequency Phase Sweep (Left-to-Right across 100% of image) */}
-                {(showPixelMap || isScanning) && (
-                  <div
-                    aria-hidden="true"
-                    className="animate-pixel-scan-horizontal absolute inset-0 pointer-events-none flex"
-                  >
-                    <div
-                      className={`h-full w-20 ${
-                        isClean
-                          ? 'bg-linear-to-r from-transparent via-emerald-400/15 to-transparent'
-                          : isScanning
-                          ? 'bg-linear-to-r from-transparent via-[#6336ff]/25 to-transparent'
-                          : 'bg-linear-to-r from-transparent via-red-500/18 to-transparent'
-                      }`}
-                    />
-                  </div>
-                )}
-
-                {/* 4. Full-Image 96-Cell (12x8) Pixel Carrier Block Lattice covering 100% of the image */}
-                {(showPixelMap || isScanning) && (
-                  <div
-                    aria-hidden="true"
-                    className="absolute inset-0 p-3 grid grid-cols-12 grid-rows-8 gap-1 pointer-events-none"
-                  >
-                    {Array.from({ length: 96 }).map((_, idx) => {
-                      if (!CARRIER_CELL_INDICES.has(idx)) {
-                        return <span key={idx} className="rounded-xs border border-white/5" />;
-                      }
-                      const cellThreshold = (idx / 96) * 100;
-                      const isCellClean =
-                        isClean || (isScanning && scanProgressPct >= cellThreshold);
-                      const isCellRewriting =
-                        isScanning &&
-                        scanProgressPct < cellThreshold &&
-                        scanProgressPct >= cellThreshold - 28;
-
-                      return (
-                        <span
-                          key={idx}
-                          className={`animate-pixel-cell rounded-xs border text-[8px] sm:text-[9px] font-mono-tabular font-semibold flex items-center justify-center transition-colors duration-300 ${
-                            isCellClean
-                              ? 'border-emerald-400/80 bg-emerald-500/25 text-emerald-100'
-                              : isCellRewriting
-                              ? 'border-[#9474ff] bg-[#6336ff]/45 text-white'
-                              : 'border-red-400/80 bg-red-500/30 text-red-100'
-                          }`}
-                        >
-                          {isCellClean ? '0x00' : isCellRewriting ? '0x7F' : 'SYID'}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* 5. Four-Corner Full-Image Viewfinder Reticle Brackets */}
-                <div aria-hidden="true" className="absolute inset-2.5 pointer-events-none">
-                  <span className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-white/70 rounded-tl-sm" />
-                  <span className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-white/70 rounded-tr-sm" />
-                  <span className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-white/70 rounded-bl-sm" />
-                  <span className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-white/70 rounded-br-sm" />
-                </div>
-
-                {/* Top Overlay Bar: Live Full-Image Pixel Scanner Status + Controls */}
-                <div className="absolute top-3.5 left-3.5 right-3.5 flex flex-wrap items-center justify-between gap-2 z-10">
-                  <span
-                    className={`px-3 py-1 rounded-full text-[11.5px] font-semibold inline-flex items-center gap-1.5 backdrop-blur-md shadow-sm ${
-                      isClean
-                        ? 'bg-emerald-500/95 text-white'
-                        : isScanning
-                        ? 'bg-[#6336ff]/95 text-white'
-                        : 'bg-red-600/90 text-white'
-                    }`}
-                  >
-                    <Scan className="w-3.5 h-3.5" />
-                    <span>
-                      {isClean
-                        ? 'Full Pixel Scan: 0% SynthID'
-                        : isScanning
-                        ? `Rewriting Full Image Pixels · ${scanProgressPct}%`
-                        : 'Full Pixel Scan: SynthID Carrier Detected'}
-                    </span>
-                  </span>
-
-                  <div className="inline-flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setShowPixelMap((prev) => !prev)}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold backdrop-blur-md transition-colors cursor-pointer ${
-                        showPixelMap
-                          ? 'bg-[#6336ff] text-white'
-                          : 'bg-black/75 text-zinc-200 hover:bg-black/90'
-                      }`}
-                    >
-                      <Eye className="w-3 h-3" />
-                      <span>{showPixelMap ? 'Pixel Scan Active' : 'Show Pixel Scan'}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      aria-label={
-                        isExpandedScanner ? 'Collapse full image view' : 'Expand full image view'
-                      }
-                      title={
-                        isExpandedScanner ? 'Collapse full image view' : 'Expand full image view'
-                      }
-                      onClick={() => setIsExpandedScanner((prev) => !prev)}
-                      className="p-1.5 rounded-full bg-black/75 hover:bg-black/90 text-white backdrop-blur-md transition-colors cursor-pointer"
-                    >
-                      {isExpandedScanner ? (
-                        <Minimize2 className="w-3.5 h-3.5" />
-                      ) : (
-                        <Maximize2 className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Bottom Live Telemetry HUD Bar across the full image */}
-                <div className="absolute bottom-3 left-3.5 right-3.5 z-10">
-                  {isScanning ? (
-                    <div className="rounded-xl bg-black/85 backdrop-blur-md px-3.5 py-2.5 text-left border border-white/15">
-                      <div className="flex items-center justify-between text-[11px] font-mono-tabular text-purple-200 mb-1.5">
-                        <span className="truncate">{PIXEL_SCAN_STEPS[scanStepIndex]}</span>
-                        <span className="shrink-0 ml-2">{scanProgressPct}%</span>
-                      </div>
-                      <div className="w-full h-1.5 rounded-full bg-white/15 overflow-hidden">
-                        <div
-                          className={`h-full bg-[#6336ff] transition-all duration-300 ${
-                            scanStepIndex === 0
-                              ? 'w-1/4'
-                              : scanStepIndex === 1
-                              ? 'w-2/4'
-                              : scanStepIndex === 2
-                              ? 'w-3/4'
-                              : 'w-full'
-                          }`}
-                        />
-                      </div>
-                    </div>
+                {/* Subtle expand/collapse control */}
+                <button
+                  type="button"
+                  aria-label={isExpandedScanner ? 'Collapse image view' : 'Expand image view'}
+                  title={isExpandedScanner ? 'Collapse image view' : 'Expand image view'}
+                  onClick={() => setIsExpandedScanner((prev) => !prev)}
+                  className="absolute top-3 right-3 p-2 rounded-full bg-black/60 hover:bg-black/90 text-white/90 hover:text-white backdrop-blur-md transition cursor-pointer z-10 opacity-70 hover:opacity-100"
+                >
+                  {isExpandedScanner ? (
+                    <Minimize2 className="w-4 h-4" />
                   ) : (
-                    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-black/75 backdrop-blur-md border border-white/10 text-[11px] font-mono-tabular text-zinc-200">
-                      <span>
-                        {activeReport.width || 1440}&times;{activeReport.height || 1080} px (
-                        {totalPixelsCount.toLocaleString()} pixels)
-                      </span>
-                      <span className={isClean ? 'text-emerald-300 font-semibold' : 'text-red-300'}>
-                        {isClean
-                          ? `Carrier: 0x00 Clean · PSNR ${activeReport.psnrDb} dB`
-                          : 'Carrier: Google SynthID (RGB LSB + Phase)'}
-                      </span>
-                    </div>
+                    <Maximize2 className="w-4 h-4" />
                   )}
-                </div>
+                </button>
+
+                {/* Minimalist Progress Indicator: ONLY shown while actively processing */}
+                {isScanning && (
+                  <>
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-white/20 overflow-hidden z-20">
+                      <div
+                        className="h-full bg-linear-to-r from-purple-500 to-indigo-500 transition-all duration-300"
+                        style={{ width: `${scanProgressPct}%` }}
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-10 pointer-events-none p-4">
+                      <div className="px-4 py-2 rounded-full bg-black/80 backdrop-blur-md text-white text-xs font-semibold shadow-lg border border-white/15 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping" />
+                        <span>{PIXEL_SCAN_STEPS[scanStepIndex]}</span>
+                        <span className="font-mono text-purple-300">({scanProgressPct}%)</span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* File Metadata Line matching screenshot: "1000604372.png  1.9 MB · PNG" */}
-            <div className="flex items-center justify-between gap-2 mb-2 text-left">
-              <div className="flex items-baseline gap-2.5 min-w-0">
+            {/* File Metadata Line: Name, Size, Format, Native Dimensions, Status */}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3 text-left">
+              <div className="flex items-baseline gap-2 min-w-0">
                 <span className="text-[15px] font-bold text-[#0d0d0d] truncate">
                   {activeReport.fileName}
                 </span>
-                <span className="text-[14.5px] text-zinc-500 font-normal whitespace-nowrap">
+                <span className="text-[14px] text-zinc-500 font-normal whitespace-nowrap">
                   {activeReport.formattedSize} &middot; {fileFormatUpper}
+                  {activeReport.width && activeReport.height ? (
+                    <> &middot; {activeReport.width}&times;{activeReport.height} px</>
+                  ) : null}
                 </span>
               </div>
 
-              {activeReport.backendVerified && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#f3efff] border border-[#e2d9ff] text-[10.5px] font-mono-tabular font-semibold text-[#6336ff] shrink-0">
-                  <Shield className="w-3 h-3" />
-                  <span>Backend Verified</span>
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {isClean ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[11px] font-semibold">
+                    <Check className="w-3 h-3 text-emerald-600 stroke-[2.5]" />
+                    <span>Clean &middot; PSNR {activeReport.psnrDb} dB</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80 text-[11px] font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    <span>SynthID Detected</span>
+                  </span>
+                )}
+
+                {activeReport.backendVerified && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#f3efff] border border-[#e2d9ff] text-[10.5px] font-mono-tabular font-semibold text-[#6336ff] shrink-0">
+                    <Shield className="w-3 h-3" />
+                    <span>Verified</span>
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Primary Status Title & Subtitle matching screenshot */}
