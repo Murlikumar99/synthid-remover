@@ -34,9 +34,11 @@ const SERVER_HMAC_SECRET =
   process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 
 // Authorized domains for CORS and Origin/Referer validation
+// Note: CORS is only a browser-side protection and does not prevent direct requests through curl, Postman, scripts, or other non-browser clients.
 const ALLOWED_ORIGINS = new Set(
   [
     process.env.APP_URL,
+    'https://synthidremovers.vercel.app',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
   ].filter(Boolean) as string[]
