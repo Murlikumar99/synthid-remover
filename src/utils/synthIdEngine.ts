@@ -1,3 +1,9 @@
+import type {
+  DisruptionMode,
+  GeminiBadgeRemovalMeta,
+  ProvenanceAuditReport,
+} from './geminiWatermarkEngine';
+
 export type MediaType = 'image' | 'video' | 'audio';
 
 export type ProcessingStage =
@@ -66,6 +72,9 @@ export interface FileScanReport {
   engineVersion?: string;
   rawBuffer?: Uint8Array;
   c2paFreeBlobUrl?: string;
+  disruptionMode?: DisruptionMode;
+  geminiBadgeMeta?: GeminiBadgeRemovalMeta;
+  provenanceAudit?: ProvenanceAuditReport;
 }
 
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp'];

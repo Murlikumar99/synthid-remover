@@ -3,6 +3,10 @@ import {
   parseAndStripJpegBuffer,
   parseAndStripWebpBuffer,
 } from './binaryMediaEngine.ts';
+import {
+  eraseGeminiCornerBadge,
+  type GeminiBadgeRemovalMeta,
+} from './geminiWatermarkEngine.ts';
 
 export interface ServerPixelRewriteResult {
   engine: 'nodejs' | 'python3';
@@ -15,6 +19,7 @@ export interface ServerPixelRewriteResult {
   chunksStripped: string[];
   bytesRemoved: number;
   pixelRewriteApplied: boolean;
+  geminiBadgeMeta?: GeminiBadgeRemovalMeta;
 }
 
 // Precomputed IEEE 802.3 CRC-32 table for valid PNG chunk reconstruction

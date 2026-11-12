@@ -19,6 +19,7 @@ import {
   calculateCreditsRequired,
   MediaType,
 } from './src/utils/synthIdEngine';
+import { scanBytesProvenance } from './src/utils/geminiWatermarkEngine';
 
 dotenv.config();
 
@@ -790,6 +791,8 @@ app.post('/api/remove-synthid', async (req: Request, res: Response) => {
         ? 'image/webp'
         : 'image/png';
 
+    const provenanceAudit = scanBytesProvenance(new Uint8Array(verifiedCleanBytes));
+
     res.status(200).json({
       status: 'clean',
       engine: rewriteResult.engine,
@@ -800,6 +803,8 @@ app.post('/api/remove-synthid', async (req: Request, res: Response) => {
       cleanedConfidence: 0,
       psnrDb,
       modifiedPixels,
+      geminiBadgeMeta: rewriteResult.geminiBadgeMeta,
+      provenanceAudit,
       cleanedDataUrl:
         verifiedCleanBytes.length > 64
           ? `data:${outMime};base64,${verifiedCleanBytes.toString('base64')}`
