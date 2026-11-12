@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="15" fill="#0d0d0d" />
+  <path
+    d="M18 12C29 22 37.5 29.5 37.5 32C37.5 34.5 29 42 18 52"
+    stroke="url(#synthid_fav_1)"
+    stroke-width="6.4"
+    stroke-linecap="round"
+  />
+  <path
+    d="M31.5 19C39.5 26 45.5 29.5 45.5 32C45.5 34.5 39.5 38 31.5 45"
+    stroke="url(#synthid_fav_2)"
+    stroke-width="5.2"
+    stroke-linecap="round"
+    opacity="0.82"
+  />
+  <defs>
+    <linearGradient id="synthid_fav_1" x1="18" y1="12" x2="37.5" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#b9a2ff" />
+      <stop offset="0.5" stop-color="#6336ff" />
+      <stop offset="1" stop-color="#bca6ff" />
+    </linearGradient>
+    <linearGradient id="synthid_fav_2" x1="31.5" y1="19" x2="45.5" y2="45" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#d4c6ff" />
+      <stop offset="0.5" stop-color="#9474ff" />
+      <stop offset="1" stop-color="#d4c6ff" />
+    </linearGradient>
+  </defs>
+</svg>
