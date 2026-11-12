@@ -85,7 +85,7 @@ export function SplitTextReveal({
           <React.Fragment key={`${token.word}-${wIdx}`}>
             <span
               aria-hidden="true"
-              className={`inline-block overflow-hidden align-bottom pb-[0.06em] -mb-[0.06em] ${wordClassName}`}
+              className={`inline-block whitespace-nowrap overflow-hidden align-bottom pb-[0.06em] -mb-[0.06em] ${wordClassName}`}
             >
               {mode === 'words' ? (
                 <span

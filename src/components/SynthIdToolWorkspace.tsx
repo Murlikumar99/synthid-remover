@@ -15,9 +15,6 @@ import {
   Minimize2,
   Eye,
   Shield,
-  Terminal,
-  Cpu,
-  Copy,
 } from 'lucide-react';
 import {
   MediaType,
@@ -48,10 +45,10 @@ interface SynthIdToolWorkspaceProps {
 type WorkflowPhase = 'c2pa_removed' | 'pixel_scanning' | 'synthid_removed';
 
 const PIXEL_SCAN_STEPS = [
-  'Scanning 100% of image pixels · Locating frequency-domain carrier...',
-  'Isolating Google SynthID phase lattice across RGB channels...',
-  'Rewriting marked pixel blocks · Preserving PSNR 51.4 dB...',
-  'Verifying 0% SynthID signal with backend cryptographic engine...',
+  'Reading pixel channels',
+  'Mapping signal carrier',
+  'Rewriting pixel blocks',
+  'Verifying clean output',
 ];
 
 function uint8ToBase64(bytes: Uint8Array | Uint8ClampedArray): string {
@@ -62,46 +59,6 @@ function uint8ToBase64(bytes: Uint8Array | Uint8ClampedArray): string {
   }
   return window.btoa(binary);
 }
-
-const NODEJS_CODE_SNIPPET = `// Node.js — Remove C2PA Chunks & Neutralize SynthID Pixel Carrier
-// Run: node scripts/remove_synthid.mjs input.png output.png
-import fs from 'node:fs';
-import zlib from 'node:zlib';
-import { removeSynthIdFromPngBuffer } from './scripts/remove_synthid.mjs';
-
-const rawPng = fs.readFileSync('input.png');
-const result = removeSynthIdFromPngBuffer(rawPng);
-fs.writeFileSync('output_clean.png', result.outputBuffer);
-
-console.log({
-  engine: 'Node.js zlib IDAT Pixel Engine',
-  dimensions: \`\${result.width}x\${result.height}\`,
-  modifiedPixels: result.modifiedPixels,
-  psnrDb: result.psnrDb,
-  strippedChunks: result.strippedChunks,
-  sha256: result.sha256,
-});`;
-
-const PYTHON_CODE_SNIPPET = `# Python 3 — Remove C2PA Chunks & Neutralize SynthID Pixel Carrier
-# Run: python3 scripts/remove_synthid.py input.png output_clean.png
-from scripts.remove_synthid import process_png_bytes
-import hashlib
-
-with open("input.png", "rb") as f:
-    raw_bytes = f.read()
-
-result = process_png_bytes(raw_bytes)
-with open("output_clean.png", "wb") as f:
-    f.write(result["outputBytes"])
-
-print({
-    "engine": "Python 3 zlib Pixel Engine",
-    "dimensions": f"{result['width']}x{result['height']}",
-    "modifiedPixels": result["modifiedPixels"],
-    "psnrDb": result["psnrDb"],
-    "chunksStripped": result["chunksStripped"],
-    "sha256": hashlib.sha256(result["outputBytes"]).hexdigest(),
-})`;
 
 export function SynthIdToolWorkspace({
   sampleImageUrl,
@@ -121,11 +78,9 @@ export function SynthIdToolWorkspace({
   const [scanStepIndex, setScanStepIndex] = useState(0);
   const [scanProgressPct, setScanProgressPct] = useState(0);
   const [isExpandedScanner, setIsExpandedScanner] = useState(false);
-  const [selectedEngine, setSelectedEngine] = useState<'nodejs' | 'python3'>('nodejs');
-  const [showCodePanel, setShowCodePanel] = useState(false);
-  const [codeTab, setCodeTab] = useState<'nodejs' | 'python3'>('nodejs');
-  const [copiedCode, setCopiedCode] = useState(false);
+  const [selectedEngine] = useState<'nodejs' | 'python3'>('nodejs');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const previewViewportRef = useRef<HTMLDivElement | null>(null);
 
   const activeReport = reports.find((r) => r.id === selectedReportId) || reports[0] || null;
 
@@ -174,7 +129,7 @@ export function SynthIdToolWorkspace({
               : binaryRes.format === 'WEBP'
               ? 'image/webp'
               : 'image/png';
-          const blob = new Blob([binaryRes.strippedBuffer], { type: outMime });
+          const blob = new Blob([binaryRes.strippedBuffer as unknown as BlobPart], { type: outMime });
           const localC2paFreeUrl = URL.createObjectURL(blob);
           const rawBase64 = uint8ToBase64(rawBuffer);
 
@@ -518,22 +473,57 @@ export function SynthIdToolWorkspace({
 
   /**
    * Triggered when user clicks the primary "Remove SynthID" button:
-   * Runs the full-image dual-axis Pixel Scanning laser sweep + backend verification (`POST /api/remove-synthid`).
+   * Runs the smooth optical scanline pass on an unblocked main thread, then executes pixel rewrite + backend verification.
    */
   const handleRemoveSynthIdClick = useCallback(async () => {
     if (reports.length === 0 || workflowPhase === 'pixel_scanning') return;
 
     setWorkflowPhase('pixel_scanning');
     setScanStepIndex(0);
-    setScanProgressPct(15);
+    setScanProgressPct(2);
 
-    for (let step = 0; step < PIXEL_SCAN_STEPS.length; step++) {
-      setScanStepIndex(step);
-      setScanProgressPct(Math.min(96, (step + 1) * 24));
-      const stageIdx = Math.min(PROCESSING_STAGES.length - 2, step + 2);
-      setReports((prev) => prev.map((rep) => advanceReportToStage(rep, stageIdx)));
-      await new Promise((r) => setTimeout(r, 360));
+    if (previewViewportRef.current && typeof previewViewportRef.current.scrollIntoView === 'function') {
+      previewViewportRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+
+    // Animate optical scanline smoothly across 48 ticks (~1.7s) on an unblocked main thread
+    const totalTicks = 48;
+    let currentTick = 0;
+    let lastStageIdx = -1;
+
+    await new Promise<void>((resolve) => {
+      const intervalId = window.setInterval(() => {
+        currentTick += 1;
+        const rawT = Math.min(1, currentTick / totalTicks);
+        // Smooth cubic ease-in-out curve for tactile optical sweep (2% -> 92%)
+        const easedT =
+          rawT < 0.5 ? 2 * rawT * rawT : 1 - Math.pow(-2 * rawT + 2, 2) / 2;
+        const pct = Math.min(92, Math.max(2, Math.round(2 + easedT * 90)));
+        const stepIdx = Math.min(
+          PIXEL_SCAN_STEPS.length - 1,
+          Math.floor(rawT * PIXEL_SCAN_STEPS.length)
+        );
+
+        setScanProgressPct(pct);
+        setScanStepIndex(stepIdx);
+
+        const stageIdx = Math.min(PROCESSING_STAGES.length - 2, stepIdx + 2);
+        if (stageIdx !== lastStageIdx) {
+          lastStageIdx = stageIdx;
+          setReports((prev) => prev.map((rep) => advanceReportToStage(rep, stageIdx)));
+        }
+
+        if (currentTick >= totalTicks) {
+          window.clearInterval(intervalId);
+          resolve();
+        }
+      }, 35);
+    });
+
+    // Final verification stage while pixel buffer rewrite & backend receipt complete
+    setScanStepIndex(PIXEL_SCAN_STEPS.length - 1);
+    setScanProgressPct(96);
+    await new Promise((r) => setTimeout(r, 60));
 
     let latestServerAccount:
       | { freeRemovalsUsed: number; creditsBalance: number }
@@ -861,86 +851,167 @@ export function SynthIdToolWorkspace({
             )}
 
             {/* CLEAN IMAGE PREVIEW VIEWPORT */}
-            <div className="relative rounded-[20px] overflow-hidden border border-zinc-200 bg-zinc-900 mb-4 shadow-sm group">
-              <div className="relative w-full overflow-hidden flex items-center justify-center bg-zinc-950 min-h-[220px]">
-                {/* Full Image rendered edge-to-edge without obstruction */}
+            <div
+              ref={previewViewportRef}
+              className="relative rounded-[20px] overflow-hidden border border-zinc-200 bg-zinc-950 mb-4 shadow-sm group"
+            >
+              <div className="relative w-full overflow-hidden flex items-center justify-center bg-zinc-950 min-h-[240px]">
+                {/* Full Image rendered clearly without muddy blur */}
                 <img
                   src={activeReport.cleanedUrl || activeReport.previewUrl || sampleImageUrl}
                   alt={activeReport.fileName}
                   referrerPolicy="no-referrer"
-                  className={`w-full h-auto block object-contain transition-all duration-300 ${
+                  className={`w-full h-auto block object-contain transition-all duration-300 select-none ${
                     isExpandedScanner ? 'max-h-[580px]' : 'max-h-[380px]'
                   }`}
                 />
 
-                {/* Subtle expand/collapse control */}
-                <button
-                  type="button"
-                  aria-label={isExpandedScanner ? 'Collapse image view' : 'Expand image view'}
-                  title={isExpandedScanner ? 'Collapse image view' : 'Expand image view'}
-                  onClick={() => setIsExpandedScanner((prev) => !prev)}
-                  className="absolute top-3 right-3 p-2 rounded-full bg-black/60 hover:bg-black/90 text-white/90 hover:text-white backdrop-blur-md transition cursor-pointer z-10 opacity-70 hover:opacity-100"
-                >
-                  {isExpandedScanner ? (
-                    <Minimize2 className="w-4 h-4" />
-                  ) : (
-                    <Maximize2 className="w-4 h-4" />
-                  )}
-                </button>
+                {/* Subtle expand/collapse control (hidden while actively scanning so top corners stay symmetrical) */}
+                {!isScanning && (
+                  <button
+                    type="button"
+                    aria-label={isExpandedScanner ? 'Collapse image view' : 'Expand image view'}
+                    title={isExpandedScanner ? 'Collapse image view' : 'Expand image view'}
+                    onClick={() => setIsExpandedScanner((prev) => !prev)}
+                    className="absolute top-3 right-3 p-2 rounded-lg bg-black/55 hover:bg-black/80 text-white/90 hover:text-white backdrop-blur-md border border-white/10 transition cursor-pointer z-20 opacity-80 hover:opacity-100"
+                  >
+                    {isExpandedScanner ? (
+                      <Minimize2 className="w-4 h-4" />
+                    ) : (
+                      <Maximize2 className="w-4 h-4" />
+                    )}
+                  </button>
+                )}
 
-                {/* Minimalist Progress Indicator: ONLY shown while actively processing */}
+                {/* Precision Optical Scan Pass: crisp image, moving scanline + pixel lattice wake + compact bottom bar */}
                 {isScanning && (
-                  <>
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-white/20 overflow-hidden z-20">
-                      <div
-                        className="h-full bg-linear-to-r from-purple-500 to-indigo-500 transition-all duration-300"
-                        style={{ width: `${scanProgressPct}%` }}
-                      />
-                    </div>
-                    <div className="absolute inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-10 pointer-events-none p-4">
-                      <div className="px-4 py-2 rounded-full bg-black/80 backdrop-blur-md text-white text-xs font-semibold shadow-lg border border-white/15 flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping" />
-                        <span>{PIXEL_SCAN_STEPS[scanStepIndex]}</span>
-                        <span className="font-mono text-purple-300">({scanProgressPct}%)</span>
+                  <div
+                    className="absolute inset-0 z-10 pointer-events-none overflow-hidden"
+                    aria-live="polite"
+                  >
+                    {/* Unscanned lower region subtle dim veil that gets wiped clean as the scanline descends */}
+                    <div
+                      className="absolute left-0 right-0 bottom-0 bg-zinc-950/30 transition-none"
+                      style={{ top: `${scanProgressPct}%` }}
+                    />
+
+                    {/* Symmetrical Optical Viewfinder Top Corner Brackets */}
+                    <div className="absolute top-3 left-3 w-3.5 h-3.5 border-t-[1.5px] border-l-[1.5px] border-white/80 rounded-tl-[2px]" />
+                    <div className="absolute top-3 right-3 w-3.5 h-3.5 border-t-[1.5px] border-r-[1.5px] border-white/80 rounded-tr-[2px]" />
+
+                    {/* Moving Horizontal Scan Plane & Trailing 64px Pixel Lattice Wake */}
+                    <div
+                      className="absolute left-0 right-0 transition-none"
+                      style={{ top: `${scanProgressPct}%` }}
+                    >
+                      {/* Trailing 64px pixel-grid wake just above the scanline */}
+                      <div className="w-full h-16 -mt-16 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#6336ff]/22 via-white/8 to-transparent" />
+                        <div className="absolute inset-0 optical-scan-wake-grid" />
+                      </div>
+
+                      {/* Razor-sharp optical scan beam */}
+                      <div className="relative w-full h-[1.5px] bg-white shadow-[0_0_10px_rgba(255,255,255,0.95),0_0_20px_rgba(99,54,255,0.85)]">
+                        <span className="absolute left-0 -top-[1.5px] w-2.5 h-[4px] bg-white rounded-r-full" />
+                        <span className="absolute right-0 -top-[1.5px] w-2.5 h-[4px] bg-white rounded-l-full" />
                       </div>
                     </div>
-                  </>
+
+                    {/* Sleek, Single-Line Bottom Instrument Bar — never obscures center of image or wraps to multiple lines */}
+                    <div className="absolute bottom-3 left-3 right-3 flex justify-center">
+                      <div className="w-full max-w-[400px] rounded-xl bg-[#0d0d0d]/90 backdrop-blur-md border border-white/14 px-3.5 py-2.5 shadow-[0_12px_32px_rgba(0,0,0,0.45)]">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <svg
+                              className="w-3.5 h-3.5 shrink-0 text-white animate-spin"
+                              viewBox="0 0 16 16"
+                              fill="none"
+                              aria-hidden="true"
+                            >
+                              <circle
+                                cx="8"
+                                cy="8"
+                                r="6"
+                                stroke="currentColor"
+                                strokeOpacity="0.22"
+                                strokeWidth="2"
+                              />
+                              <path
+                                d="M14 8a6 6 0 0 0-6-6"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                            <span className="text-[12.5px] font-medium text-white truncate">
+                              {PIXEL_SCAN_STEPS[scanStepIndex]}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 font-mono-tabular">
+                            <span className="text-[11px] text-zinc-400">
+                              {scanStepIndex + 1}/{PIXEL_SCAN_STEPS.length}
+                            </span>
+                            <span className="text-[12px] font-semibold text-white tabular-nums w-[34px] text-right">
+                              {scanProgressPct}%
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Integrated hairline progress track */}
+                        <div className="mt-2 h-[2px] w-full rounded-full bg-white/12 overflow-hidden">
+                          <div
+                            className="h-full bg-white rounded-full transition-none"
+                            style={{ width: `${scanProgressPct}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* File Metadata Line: Name, Size, Format, Native Dimensions, Status */}
+            {/* File Metadata Line: Clean unboxed metadata with typographic separators */}
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3 text-left">
               <div className="flex items-baseline gap-2 min-w-0">
                 <span className="text-[15px] font-bold text-[#0d0d0d] truncate">
                   {activeReport.fileName}
                 </span>
-                <span className="text-[14px] text-zinc-500 font-normal whitespace-nowrap">
+                <span className="text-[13.5px] text-zinc-500 font-normal whitespace-nowrap font-mono-tabular">
                   {activeReport.formattedSize} &middot; {fileFormatUpper}
                   {activeReport.width && activeReport.height ? (
-                    <> &middot; {activeReport.width}&times;{activeReport.height} px</>
+                    <> &middot; {activeReport.width}&times;{activeReport.height}</>
                   ) : null}
                 </span>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 text-[12.5px] font-medium shrink-0">
                 {isClean ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[11px] font-semibold">
-                    <Check className="w-3 h-3 text-emerald-600 stroke-[2.5]" />
-                    <span>Clean &middot; PSNR {activeReport.psnrDb} dB</span>
+                  <span className="inline-flex items-center gap-1 text-emerald-700">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5] shrink-0" />
+                    <span>Clean</span>
+                    <span aria-hidden="true" className="text-zinc-300">&middot;</span>
+                    <span className="font-mono-tabular">{activeReport.psnrDb} dB</span>
+                  </span>
+                ) : isScanning ? (
+                  <span className="inline-flex items-center gap-1.5 text-[#6336ff] font-mono-tabular">
+                    <span>Scanning {scanProgressPct}%</span>
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80 text-[11px] font-semibold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  <span className="inline-flex items-center gap-1.5 text-amber-700">
                     <span>SynthID Detected</span>
                   </span>
                 )}
 
                 {activeReport.backendVerified && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#f3efff] border border-[#e2d9ff] text-[10.5px] font-mono-tabular font-semibold text-[#6336ff] shrink-0">
-                    <Shield className="w-3 h-3" />
-                    <span>Verified</span>
-                  </span>
+                  <>
+                    <span aria-hidden="true" className="text-zinc-300">&middot;</span>
+                    <span className="inline-flex items-center gap-1 text-zinc-600">
+                      <Shield className="w-3.5 h-3.5 text-[#6336ff] shrink-0" />
+                      <span>Verified</span>
+                    </span>
+                  </>
                 )}
               </div>
             </div>
@@ -1026,7 +1097,7 @@ export function SynthIdToolWorkspace({
                   : 'bg-[#fff6f6] border-[#f6d8d8]'
               }`}
             >
-              <PlatformMiniStack isClean={isClean} />
+              <PlatformMiniStack />
               <div className="min-w-0">
                 <div className="text-[16.5px] font-bold text-[#0d0d0d] leading-snug">
                   {isClean ? 'SynthID removed from pixels' : 'SynthID stays embedded'}
@@ -1039,47 +1110,12 @@ export function SynthIdToolWorkspace({
               </div>
             </div>
 
-            {/* Backend Runtime Engine Selector: Node.js vs Python 3 */}
-            <div className="rounded-[16px] border border-zinc-200/90 bg-[#fafafa] p-2.5 mb-5 flex flex-wrap items-center justify-between gap-2 text-left">
-              <div className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-zinc-700 pl-1">
-                <Cpu className="w-3.5 h-3.5 text-[#6336ff]" />
-                <span>Backend Engine:</span>
-              </div>
-              <div className="inline-flex items-center rounded-xl bg-white border border-zinc-200 p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setSelectedEngine('nodejs')}
-                  className={`px-2.5 py-1 rounded-lg text-[11.5px] font-semibold transition-colors cursor-pointer ${
-                    selectedEngine === 'nodejs'
-                      ? 'bg-[#6336ff] text-white'
-                      : 'text-zinc-600 hover:text-[#0d0d0d]'
-                  }`}
-                >
-                  Node.js (zlib IDAT)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedEngine('python3')}
-                  className={`px-2.5 py-1 rounded-lg text-[11.5px] font-semibold transition-colors cursor-pointer ${
-                    selectedEngine === 'python3'
-                      ? 'bg-[#6336ff] text-white'
-                      : 'text-zinc-600 hover:text-[#0d0d0d]'
-                  }`}
-                >
-                  Python 3 (zlib Pixel)
-                </button>
-              </div>
-            </div>
-
             {/* Server Cryptographic Verification Receipt when SynthID is removed */}
             {isClean && activeReport.receiptId && (
               <div className="rounded-[16px] border border-[#e2d9ff] bg-[#faf8ff] px-4 py-3 mb-5 text-left font-mono-tabular text-[11px] text-zinc-600 space-y-1">
-                <div className="flex items-center justify-between text-[#6336ff] font-semibold">
-                  <span>RECEIPT · {activeReport.receiptId}</span>
-                  <span>HMAC-SHA256 SIGNED</span>
-                </div>
-                <div className="truncate font-semibold text-zinc-700">
-                  ENGINE: {activeReport.engineVersion || 'Node.js v22 (zlib IDAT Engine)'}
+                <div className="flex items-center justify-between gap-2 text-[#6336ff] font-semibold">
+                  <span className="truncate">RECEIPT · {activeReport.receiptId}</span>
+                  <span className="whitespace-nowrap shrink-0">HMAC-SHA256</span>
                 </div>
                 <div className="truncate">
                   SHA-256: {activeReport.cleanedSha256?.slice(0, 36)}…
@@ -1091,7 +1127,7 @@ export function SynthIdToolWorkspace({
             )}
 
             {/* Primary Action Row matching screenshot: Left Reset Square Button + Right "Remove SynthID" / "Download" CTA */}
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-2.5 sm:gap-3 mb-4 w-full">
               <button
                 type="button"
                 aria-label="Upload another file"
@@ -1101,9 +1137,9 @@ export function SynthIdToolWorkspace({
                   setSelectedReportId(null);
                   setWorkflowPhase('c2pa_removed');
                 }}
-                className="w-14 h-14 rounded-[16px] border border-zinc-200 bg-white hover:bg-zinc-50 text-[#0d0d0d] inline-flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+                className="w-12 h-12 sm:w-14 sm:h-14 rounded-[14px] sm:rounded-[16px] border border-zinc-200 bg-white hover:bg-zinc-50 text-[#0d0d0d] inline-flex items-center justify-center shrink-0 transition-colors cursor-pointer"
               >
-                <RotateCcw className="w-5 h-5 stroke-[2]" />
+                <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2]" />
               </button>
 
               {!isClean ? (
@@ -1111,34 +1147,32 @@ export function SynthIdToolWorkspace({
                   type="button"
                   disabled={isScanning}
                   onClick={handleRemoveSynthIdClick}
-                  className="flex-1 h-14 rounded-[16px] bg-[#6336ff] hover:bg-[#5326ee] disabled:opacity-60 text-white text-[17px] font-bold shadow-[0_10px_25px_-6px_rgba(99,54,255,0.5)] transition-all cursor-pointer inline-flex items-center justify-center gap-2"
+                  className="flex-1 min-w-0 h-12 sm:h-14 px-3.5 sm:px-5 rounded-[14px] sm:rounded-[16px] bg-[#6336ff] hover:bg-[#5326ee] disabled:opacity-60 text-white text-[14px] sm:text-[17px] font-bold shadow-[0_10px_25px_-6px_rgba(99,54,255,0.5)] transition-all cursor-pointer inline-flex items-center justify-center gap-2"
                 >
-                  <span>
-                    {isScanning
-                      ? `Removing SynthID (${selectedEngine === 'python3' ? 'Python 3' : 'Node.js'})…`
-                      : 'Remove SynthID'}
+                  <span className="whitespace-nowrap">
+                    {isScanning ? 'Removing SynthID…' : 'Remove SynthID'}
                   </span>
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={() => handleDownload(activeReport, 'full_clean')}
-                  className="flex-1 h-14 rounded-[16px] bg-[#6336ff] hover:bg-[#5326ee] text-white text-[17px] font-bold shadow-[0_10px_25px_-6px_rgba(99,54,255,0.5)] transition-all cursor-pointer inline-flex items-center justify-center gap-2"
+                  className="flex-1 min-w-0 h-12 sm:h-14 px-2 sm:px-5 rounded-[14px] sm:rounded-[16px] bg-[#6336ff] hover:bg-[#5326ee] text-white text-[11.5px] sm:text-[16px] tracking-[-0.015em] font-bold shadow-[0_10px_25px_-6px_rgba(99,54,255,0.5)] transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 sm:gap-2"
                 >
-                  <Download className="w-5 h-5 stroke-[2.2]" />
-                  <span>Download without SynthID &amp; C2PA</span>
+                  <Download className="w-3.5 h-3.5 sm:w-5 sm:h-5 stroke-[2.2] shrink-0" />
+                  <span className="whitespace-nowrap">Download without SynthID &amp; C2PA</span>
                 </button>
               )}
             </div>
 
             {/* Bottom Secondary Action Link matching screenshot: "Download without C2PA" */}
-            <div className="flex items-center justify-center gap-5 pt-1">
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-1">
               <button
                 type="button"
                 onClick={() => handleDownload(activeReport, 'c2pa_only')}
-                className="inline-flex items-center gap-2 text-[14.5px] font-medium text-zinc-600 hover:text-[#0d0d0d] cursor-pointer group"
+                className="inline-flex items-center gap-1.5 text-[13.5px] sm:text-[14.5px] font-medium text-zinc-600 hover:text-[#0d0d0d] cursor-pointer group whitespace-nowrap shrink-0"
               >
-                <Download className="w-4 h-4 text-zinc-500 group-hover:text-[#0d0d0d]" />
+                <Download className="w-4 h-4 text-zinc-500 group-hover:text-[#0d0d0d] shrink-0" />
                 <span className="underline underline-offset-4 decoration-zinc-400">
                   Download without C2PA
                 </span>
@@ -1148,17 +1182,17 @@ export function SynthIdToolWorkspace({
                 <button
                   type="button"
                   onClick={handleRemoveSynthIdClick}
-                  className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[#6336ff] hover:underline cursor-pointer"
+                  className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[#6336ff] hover:underline cursor-pointer whitespace-nowrap shrink-0"
                 >
-                  <Scan className="w-3.5 h-3.5" />
-                  <span>Re-scan full image pixels</span>
+                  <Scan className="w-3.5 h-3.5 shrink-0" />
+                  <span>Re-scan image pixels</span>
                 </button>
               )}
             </div>
           </div>
         )}
 
-        {/* Bottom Privacy & Quality Reassurance Bar + Quick Sample Loader + Node.js / Python Code Toggle */}
+        {/* Bottom Privacy & Quality Reassurance Bar + Quick Sample Loader */}
         <div className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[12px] text-zinc-400">
           <span className="inline-flex items-center gap-1.5">
             <Lock className="w-3.5 h-3.5 text-zinc-400 stroke-[2]" />
@@ -1181,64 +1215,7 @@ export function SynthIdToolWorkspace({
               <ArrowRight className="w-3 h-3" />
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setShowCodePanel((prev) => !prev)}
-            className="inline-flex items-center gap-1 text-[12px] font-semibold text-zinc-600 hover:text-[#6336ff] cursor-pointer whitespace-nowrap shrink-0"
-          >
-            <Terminal className="w-3.5 h-3.5" />
-            <span>{showCodePanel ? 'Hide Node.js & Python Code' : 'Node.js & Python Code'}</span>
-          </button>
         </div>
-
-        {/* Collapsible Node.js & Python 3 CLI / SDK Code Panel */}
-        {showCodePanel && (
-          <div className="mt-4 rounded-[20px] border border-zinc-200 bg-[#0d0d0d] text-zinc-100 p-4 sm:p-5 text-left shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-white/10">
-              <div className="inline-flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setCodeTab('nodejs')}
-                  className={`px-3 py-1 rounded-lg text-[12px] font-semibold transition-colors cursor-pointer ${
-                    codeTab === 'nodejs'
-                      ? 'bg-[#6336ff] text-white'
-                      : 'bg-white/10 text-zinc-300 hover:text-white'
-                  }`}
-                >
-                  Node.js (scripts/remove_synthid.mjs)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCodeTab('python3')}
-                  className={`px-3 py-1 rounded-lg text-[12px] font-semibold transition-colors cursor-pointer ${
-                    codeTab === 'python3'
-                      ? 'bg-[#6336ff] text-white'
-                      : 'bg-white/10 text-zinc-300 hover:text-white'
-                  }`}
-                >
-                  Python 3 (scripts/remove_synthid.py)
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const snippet =
-                    codeTab === 'nodejs' ? NODEJS_CODE_SNIPPET : PYTHON_CODE_SNIPPET;
-                  navigator.clipboard?.writeText(snippet);
-                  setCopiedCode(true);
-                  setTimeout(() => setCopiedCode(false), 1800);
-                }}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/15 text-[11.5px] font-medium text-zinc-200 cursor-pointer"
-              >
-                <Copy className="w-3.5 h-3.5" />
-                <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
-              </button>
-            </div>
-            <pre className="text-[11.5px] leading-relaxed font-mono-tabular text-zinc-200 overflow-x-auto">
-              <code>{codeTab === 'nodejs' ? NODEJS_CODE_SNIPPET : PYTHON_CODE_SNIPPET}</code>
-            </pre>
-          </div>
-        )}
       </div>
     </div>
   );

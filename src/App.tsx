@@ -552,8 +552,8 @@ export default function App() {
           </div>
 
           <div className="pt-8 border-t border-[#ececef] flex flex-wrap items-center justify-between gap-4 text-[12px] text-zinc-400">
-            <span>© 2026 removesynthid.io · Not affiliated with Google.</span>
-            <span>Use on content you own or have the rights to.</span>
+            <span>© 2026 SynthID Remover. All rights reserved.</span>
+            <span>Lossless pixel-level watermark &amp; C2PA metadata cleaner.</span>
           </div>
         </div>
       </footer>

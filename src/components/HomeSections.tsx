@@ -1232,14 +1232,7 @@ export function HomeSections({
       </section>
 
       {/* 13. Bottom Hero CTA with REMOVE Outline Text */}
-      <section className="group relative border-t border-[#ececef] bg-white py-28 px-6 overflow-hidden">
-        <div
-          aria-hidden="true"
-          className="remove-outline-text absolute inset-x-0 bottom-2 text-center text-[110px] sm:text-[190px] lg:text-[240px] pointer-events-none select-none"
-        >
-          <SplitTextReveal text="REMOVE" mode="chars" stagger={0.07} />
-        </div>
-
+      <section className="group relative border-t border-[#ececef] bg-white pt-20 sm:pt-28 pb-10 sm:pb-14 px-6 overflow-hidden">
         <div className="relative z-10 max-w-xl mx-auto text-center">
           <h2 className="text-[40px] sm:text-[52px] font-extrabold tracking-[-0.035em] leading-[1.06] text-[#0d0d0d] mb-4">
             <SplitTextReveal text="Your content." />
@@ -1260,6 +1253,13 @@ export function HomeSections({
             <span>Remove SynthID now</span>
             <ArrowRight className="w-4 h-4" />
           </button>
+        </div>
+
+        <div
+          aria-hidden="true"
+          className="remove-outline-text mt-10 sm:mt-14 text-center text-[clamp(56px,17vw,210px)] whitespace-nowrap pointer-events-none select-none"
+        >
+          <SplitTextReveal text="REMOVE" mode="chars" stagger={0.07} />
         </div>
       </section>
     </div>

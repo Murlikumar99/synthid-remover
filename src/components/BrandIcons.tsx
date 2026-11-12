@@ -41,24 +41,30 @@ export function SynthIdLogoMark({ className = 'w-6 h-8' }: { className?: string 
 }
 
 export function BrandWordmark({ variant = 'header' }: { variant?: 'header' | 'footer' | 'login' }) {
-  if (variant === 'footer') {
-    return (
-      <span className="group/brand inline-flex items-center gap-2.5 select-none">
-        <SynthIdLogoMark className="w-4 h-6 shrink-0" />
-        <span className="text-[15px] font-bold tracking-tight text-[#0d0d0d]">
-          removesynthid<span className="text-[#6336ff]">.io</span>
-        </span>
-      </span>
-    );
-  }
   return (
     <span className="group/brand inline-flex items-center gap-2 select-none">
-      <SynthIdLogoMark className={variant === 'login' ? 'w-7 h-9 shrink-0' : 'w-6 h-8 shrink-0'} />
+      <SynthIdLogoMark
+        className={
+          variant === 'login'
+            ? 'w-7 h-9 shrink-0'
+            : variant === 'footer'
+            ? 'w-5 h-7 shrink-0'
+            : 'w-6 h-8 shrink-0'
+        }
+      />
       <span className="inline-flex items-baseline gap-1">
-        <span className={`${variant === 'login' ? 'text-xl' : 'text-[17px]'} font-bold tracking-tight text-[#0d0d0d]`}>
+        <span
+          className={`${
+            variant === 'login' ? 'text-xl' : variant === 'footer' ? 'text-[16px]' : 'text-[17px]'
+          } font-bold tracking-tight text-[#0d0d0d]`}
+        >
           SynthID
         </span>
-        <span className={`${variant === 'login' ? 'text-xs' : 'text-[10px]'} font-medium text-zinc-400 tracking-normal`}>
+        <span
+          className={`${
+            variant === 'login' ? 'text-xs' : 'text-[10px]'
+          } font-medium text-zinc-400 tracking-normal`}
+        >
           Remover
         </span>
       </span>
@@ -327,14 +333,14 @@ export function ByteDancePurpleIcon({ className = 'w-4 h-4' }: { className?: str
 }
 
 /**
- * Overlapping 5-platform badge stack (Instagram, TikTok, X, Facebook, YouTube + status dot)
- * matching the embedded SynthID warning callout card when an image is uploaded.
+ * Overlapping 5-platform badge stack (Instagram, TikTok, X, Facebook, YouTube)
+ * matching the embedded SynthID callout card when an image is uploaded.
  */
-export function PlatformMiniStack({ isClean = false }: { isClean?: boolean }) {
+export function PlatformMiniStack() {
   return (
     <span className="inline-flex items-center -space-x-2 shrink-0 select-none" aria-hidden="true">
       {/* Instagram */}
-      <span className="w-8 h-8 rounded-full ig-radial-bg ring-2 ring-[#fff6f6] inline-flex items-center justify-center shadow-xs">
+      <span className="w-8 h-8 rounded-full ig-radial-bg ring-2 ring-white inline-flex items-center justify-center shadow-xs">
         <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none">
           <rect x="4" y="4" width="16" height="16" rx="5" stroke="#fff" strokeWidth="2" />
           <circle cx="12" cy="12" r="3.5" stroke="#fff" strokeWidth="2" />
@@ -342,7 +348,7 @@ export function PlatformMiniStack({ isClean = false }: { isClean?: boolean }) {
         </svg>
       </span>
       {/* TikTok */}
-      <span className="w-8 h-8 rounded-full bg-black ring-2 ring-[#fff6f6] inline-flex items-center justify-center shadow-xs">
+      <span className="w-8 h-8 rounded-full bg-black ring-2 ring-white inline-flex items-center justify-center shadow-xs">
         <svg viewBox="0 0 24 24" className="w-4 h-4">
           <path
             fill="#fff"
@@ -351,7 +357,7 @@ export function PlatformMiniStack({ isClean = false }: { isClean?: boolean }) {
         </svg>
       </span>
       {/* X */}
-      <span className="w-8 h-8 rounded-full bg-black ring-2 ring-[#fff6f6] inline-flex items-center justify-center shadow-xs">
+      <span className="w-8 h-8 rounded-full bg-black ring-2 ring-white inline-flex items-center justify-center shadow-xs">
         <svg viewBox="0 0 24 24" className="w-3.5 h-3.5">
           <path
             fill="#fff"
@@ -360,7 +366,7 @@ export function PlatformMiniStack({ isClean = false }: { isClean?: boolean }) {
         </svg>
       </span>
       {/* Facebook */}
-      <span className="w-8 h-8 rounded-full bg-[#1877F2] ring-2 ring-[#fff6f6] inline-flex items-center justify-center shadow-xs">
+      <span className="w-8 h-8 rounded-full bg-[#1877F2] ring-2 ring-white inline-flex items-center justify-center shadow-xs">
         <svg viewBox="0 0 24 24" className="w-4 h-4">
           <path
             fill="#fff"
@@ -369,17 +375,11 @@ export function PlatformMiniStack({ isClean = false }: { isClean?: boolean }) {
         </svg>
       </span>
       {/* YouTube */}
-      <span className="w-8 h-8 rounded-full bg-[#FF0000] ring-2 ring-[#fff6f6] inline-flex items-center justify-center shadow-xs">
+      <span className="w-8 h-8 rounded-full bg-[#FF0000] ring-2 ring-white inline-flex items-center justify-center shadow-xs">
         <svg viewBox="0 0 24 24" className="w-4 h-4">
           <path fill="#fff" d="M7.8 5.4L19.2 12 7.8 18.6V5.4Z" />
         </svg>
       </span>
-      {/* Status Indicator Dot */}
-      <span
-        className={`w-4 h-4 rounded-full ring-2 ring-[#fff6f6] self-end -ml-2.5 mb-0.5 ${
-          isClean ? 'bg-emerald-500' : 'bg-[#e53e3e] animate-radar-dot'
-        }`}
-      />
     </span>
   );
 }
